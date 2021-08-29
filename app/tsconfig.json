@@ -1,0 +1,24 @@
+{
+    "compilerOptions": {
+        "outDir": "./dist/",
+        "sourceMap": true,
+        "strict": false,
+        "noImplicitReturns": true,
+        "noImplicitAny": false,
+        "module": "es6",
+        "moduleResolution": "node",
+        "target": "es5",
+        "allowJs": true,
+        "jsx": "react",
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true,
+        "preserveConstEnums": true,
+        "strictNullChecks": false,
+        "strictBindCallApply": false,
+        "strictPropertyInitialization": false,
+    },
+    "include": [
+        //"./src/**/*.ts*"
+        "./src/index.tsx"
+    ]
+}
