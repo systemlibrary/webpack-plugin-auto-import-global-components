@@ -2,7 +2,7 @@
   "name": "test-auto-import-global-components",
   "main": "index.tsx",
   "scripts": {
-    "build": "webpack --mode development"
+    "dev": "webpack --mode development"
   },
   "dependencies": {
     "react": "^17.0.2",

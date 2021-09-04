@@ -20,7 +20,7 @@ function getGlobalStatement(globalPath, components, existingGlobals, debug) {
 
         let newModule = tempModule + ' = {};';
         if (existingGlobals.includes(newModule)) {
-            warn("Skipping " + newModule + " as it already has been added");
+            //warn("Skipping " + newModule + " as it already has been added");
         }
         else {
             if (!globals.includes(newModule))

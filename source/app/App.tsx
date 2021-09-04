@@ -14,8 +14,8 @@ class App extends React.Component<Props> {
     return (
       <>
         <h1>
-          Hello {name}
-          <BreadCrumbs color={"red"} backgroundColor={"black"} start={1} end={3} />
+          Hello Loaded Component onLoad() through Javascript itself {name}
+          <BreadCrumbs color={"red"} anotherColor={""} backgroundColor={"black"} start={22} end={33} />
         </h1>
       </>
     );

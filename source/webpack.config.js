@@ -1,12 +1,12 @@
-const webpack = require('webpack');
 const path = require('path');
 
 const autoImportGlobalComponentsPlugin = require('./plugin/index');
+const dir = path.resolve(__dirname, '');
 
 const config = {
-  entry: './src/index.tsx',
+  entry: './app/index.tsx',
   output: {
-    path: path.resolve(__dirname, 'dist'),
+    path: dir + '/dist',
     filename: 'bundle.js'
   },
   module: {
@@ -20,12 +20,12 @@ const config = {
   },
   plugins: [
     new autoImportGlobalComponentsPlugin({
-      clean: false,
-      debug: true,
+      clean: true,
+      debug: false,
       rules: [
         {
-          folders: ['./src/Modules/'],
-          entries: ['./src/index.tsx']
+          folders: ['./app/Modules/'],
+          entries: ['./app/index.tsx']
         },
       ],
     })
