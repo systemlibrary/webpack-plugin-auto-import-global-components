@@ -6,6 +6,7 @@ const { getImportStatements } = require('./_getImportStatement');
 const { getComponents } = require('./_getComponents');
 const { getGlobalStatement } = require('./_getGlobalStatement');
 
+
 const validateConfiguration = (rules) => {
     if (!rules || rules === undefined || rules.length === 0) {
         error("an array of 'rules' is missing in your webpack configuration");
@@ -148,7 +149,16 @@ class AutoImportGlobalComponentsPlugin {
     }
 
     apply(compiler) {
+        compiler.hooks.watchRun.tap('AutoImportGlobalComponentsPluginwatch', () => {
+            console.log("ON WATCH TAP!");
+        })
+
+        compiler.hooks.beforeCompile.tap('AutoImportGlobalComponentsPluginBeforeCompile', () => {
+            console.log("BEFORE COMPILE!!");
+        })
+
         compiler.hooks.compilation.tap("AutoImportGlobalComponentsPlugin", (compilation) => {
+            console.log("ON COMPILATION TAP ");
             this.options.forEach(rule => {
                 fillRuleData(rule, this.options.debug);
             })
@@ -160,6 +170,7 @@ class AutoImportGlobalComponentsPlugin {
         });
 
         compiler.hooks.afterEmit.tap('AfterCompile', (compiliation) => {
+            console.log("ON AFTER COMPILE TAP");
             if (this.options.clean !== false) {
                 this.options.forEach(rule => {
                     cleanRuleData(rule);
