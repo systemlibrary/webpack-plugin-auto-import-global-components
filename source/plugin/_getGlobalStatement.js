@@ -1,4 +1,4 @@
-const { warn } = require('./_console');
+const { warn } = require('./functions/_console');
 
 function getGlobalStatement(globalPath, components, existingGlobals, debug) {
     if (components.length <= 0) return [];
@@ -11,7 +11,7 @@ function getGlobalStatement(globalPath, components, existingGlobals, debug) {
     let globals = [];
 
     let parts = globalPath.split('.');
-    let parent = 'global.';
+    let parent = 'globalThis.';
 
     //New up objects on the "globalThis" equal to the folder structure of components
     parts.forEach(part => {
@@ -23,13 +23,17 @@ function getGlobalStatement(globalPath, components, existingGlobals, debug) {
             //warn("Skipping " + newModule + " as it already has been added");
         }
         else {
-            if (!globals.includes(newModule))
+            if (!globals.includes(newModule)) {
                 globals.push(newModule);
+            }
         }
     });
 
     components.forEach(c => {
-        globals.push('global.' + globalPath + '.' + c.name + ' = ' + c.name + ';');
+        let text = 'globalThis.' + globalPath + '.' + c.name + ' = ' + c.name + ';';
+        if (!existingGlobals.includes(text)) {
+            globals.push(text);
+        }
     })
 
     return globals;

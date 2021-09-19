@@ -1,28 +1,9 @@
-const fs = require("fs");
-const { warn, error } = require('./_console');
-const { getValidatedAbsolutePaths, convertToRelativeForwardUri } = require('./_path');
-const { getAbsoluteModulePaths, readFile } = require('./_file');
+const { success, warn, error } = require('./functions/_console');
+const { getRelativeForwardUri, getRelativeBackwardUri } = require('./functions/_path');
+const { validateRules, loadComponentsForRules, useCachedImportsAndGlobals, getExportedComponentNames, writeRule, cleanRule } = require('./components/_rules');
+const { read } = require('./functions/_file');
 const { getImportStatements } = require('./_getImportStatement');
-const { getComponents } = require('./_getComponents');
 const { getGlobalStatement } = require('./_getGlobalStatement');
-
-
-const validateConfiguration = (rules) => {
-    if (!rules || rules === undefined || rules.length === 0) {
-        error("an array of 'rules' is missing in your webpack configuration");
-    }
-
-    let validatedRules = [];
-    rules.forEach(rule => {
-        rule.absoluteFolders = getValidatedAbsolutePaths(rule.folders);
-        rule.absoluteEntries = getValidatedAbsolutePaths(rule.entries, true);
-        rule.imports = [];
-        rule.globals = [];
-        validatedRules.push(rule);
-    })
-
-    return validatedRules;
-}
 
 const getGlobalPath = (importPath) => {
     if (!importPath) return '';
@@ -48,140 +29,192 @@ const getGlobalPath = (importPath) => {
     return path;
 }
 
-const getImportPath = (rule, absoluteModulePath) => {
-    absoluteModulePath = convertToRelativeForwardUri(absoluteModulePath);
-
-    let result = '';
-
-    rule.folders.forEach(folder => {
-        folder = convertToRelativeForwardUri(folder);
+const getComponentFolderPath = (component, folders) => {
+    let result = null;
+    if (!folders || folders.length === 0) {
+        return result;
+    }
+    folders.every(folder => {
+        folder = getRelativeBackwardUri(folder);
         if (folder.startsWith("/")) {
             folder = folder.substring(1);
         }
-        if (absoluteModulePath.includes(folder)) {
-            let relativePath = absoluteModulePath.split(folder)[1];
-            let fullRelativePath = folder + relativePath;
-
-            rule.entries.forEach(entryPath => {
-                let entryParts = convertToRelativeForwardUri(entryPath).split('/');
-                entryParts.forEach(entryPart => {
-                    if (fullRelativePath.startsWith(entryPart)) {
-                        fullRelativePath = fullRelativePath.replace(entryPart, '');
-                        if (fullRelativePath.startsWith('/')) {
-                            fullRelativePath = fullRelativePath.substring(1);
-                        }
-                    }
-                })
-            })
-
-            let extension = fullRelativePath.split('.').pop();
-            let fullRelativeModule = fullRelativePath.replace('.' + extension, '');
-            result = './' + fullRelativeModule;
+        if (component.includes(folder)) {
+            result = folder;
+            return false;
         }
     })
     return result;
 }
 
-const fillRuleData = (rule, debug) => {
-    rule.folders.forEach((folder, i) => {
-        const moduleFiles = getAbsoluteModulePaths(folder);
+const getComponentImportPath = (component, rule) => {
+    let componentFolderPath = getComponentFolderPath(component, rule.folders);
+    if (componentFolderPath === null) {
+        warn("Could not find folder of " + component);
+        return null;
+    }
+    let relativePath = component.split(componentFolderPath)[1].split('.')[0];
 
-        moduleFiles.forEach(file => {
-            const lines = readFile(file);
 
-            const importPath = getImportPath(rule, file);
+    let fullRelativePath = componentFolderPath + relativePath;
 
-            const globalPath = getGlobalPath(importPath);
+    if (fullRelativePath.startsWith('\\') === true) {
+        fullRelativePath = fullRelativePath.substring(1);
+    }
 
-            const components = getComponents(lines, debug);
+    if (rule.entries.length > 1) {
+        error("rule.entries contains more than 1 entry with first entry: " + rule.entries[0] + ". We currently support only one entry even though its an array");
+    }
 
-            rule.imports = rule.imports.concat(getImportStatements(components, importPath, debug));
-
-            rule.globals = rule.globals.concat(getGlobalStatement(globalPath, components, rule.globals, debug));
-        });
-    });
-}
-
-const writeRuleData = (rule) => {
-    rule.absoluteEntries.forEach(entry => {
-        let data = "\n//auto-global-react-module-plugin start\n";
-        rule.imports.forEach(imp => {
-            data += imp + '\n';
-        })
-
-        rule.globals.forEach(glo => {
-            data += glo + '\n';
-        })
-
-        data += "//auto-global-react-module-plugin end\n";
-
-        fs.appendFileSync(entry, data);
-    });
-}
-
-const cleanRuleData = (rule) => {
-    rule.absoluteEntries.forEach(entry => {
-        const readFileStream = fs.readFileSync(entry, "utf8");
-        const content = readFileStream.toString();
-
-        if (content && content.length > 32) {
-            let index = content.indexOf('\n//auto-global-react-module-plugin start');
-            if (index >= 0) {
-                fs.writeFileSync(entry, content.substring(0, index));
-                //TODO: also search for 'plugin end' after the index, to append those lines again if any.
+    rule.entries.forEach(entryPath => {
+        let entryParts = getRelativeBackwardUri(entryPath).split("\\");
+        entryParts.every(entryPart => {
+            if (entryPart.length > 0) {
+                if (fullRelativePath.startsWith(entryPart)) {
+                    fullRelativePath = fullRelativePath.replace(entryPart, '');
+                }
+                else {
+                    return false;
+                }
             }
+            return true;
+        })
+    })
+
+    return "." + getRelativeForwardUri(fullRelativePath);
+}
+
+const getExportedComponentsFullPaths = (components, debug) => {
+    let exportedComponents = [];
+    components.forEach((component, i) => {
+        const lines = read(component, debug);
+        if (lines && lines.length > 1) {
+            exportedComponents = exportedComponents.concat(getExportedComponentNames(lines, component, debug));
         }
     });
+    return exportedComponents;
+}
+
+const loadImportsAndGlobalsForRule = (rule, debug) => {
+    let components = rule.components;
+
+    let exportedComponents = getExportedComponentsFullPaths(components, debug);
+
+    if (useCachedImportsAndGlobals(rule.previousExportedComponents, exportedComponents, debug)) {
+        rule.imports = rule.previousImports;
+        rule.globals = rule.previousGlobals;
+        rule.cachedImportsAndGlobals = true;
+    }
+    else {
+        rule.imports = [];
+        rule.globals = [];
+        exportedComponents.forEach(component => {
+            const importPath = getComponentImportPath(component.path, rule);
+
+            const filteredComponents = exportedComponents.filter(x => x.path === component.path);
+
+            rule.imports = rule.imports.concat(getImportStatements(filteredComponents, importPath, rule.imports, debug));
+
+            const globalPath = getGlobalPath(importPath);
+            rule.globals = rule.globals.concat(getGlobalStatement(globalPath, filteredComponents, rule.globals, debug));
+        })
+    }
+
+    rule.previousExportedComponents = exportedComponents;
+    rule.previousGlobals = rule.globals;
+    rule.previousImports = rule.imports;
+}
+
+const loadGlobalsAndImportsForRules = (options) => {
+    let debug = options.debug;
+    let rules = options.rules;
+
+    loadComponentsForRules(rules);
+
+    rules.forEach((rule, i) => {
+        loadImportsAndGlobalsForRule(rule, debug);
+    })
 }
 
 class AutoImportGlobalComponentsPlugin {
+    previousRun = {
+        imports: [],
+        globals: []
+    }
+
     constructor(options) {
-        this.options = validateConfiguration(options.rules);
-        this.options.debug = options.debug;
-        this.options.clean = options.clean;
+        validateRules(options.rules);
+        this.options = options;
+        this.options.isInWatchBuild = false;
+        this.options.filesChanged = [];
+        this.options.isInWatchBuildCancel = false;
 
-        warn("Configuration validated", this.options.debug);
-
-        this.options.forEach(rule => {
-            cleanRuleData(rule);
-            console.log(rule.globals);
-        });
+        success("configuration validated");
     }
 
     apply(compiler) {
-        compiler.hooks.watchRun.tap('AutoImportGlobalComponentsPluginwatch', () => {
-            console.log("ON WATCH TAP!");
-        })
+        const hooks = compiler.hooks;
 
-        compiler.hooks.beforeCompile.tap('AutoImportGlobalComponentsPluginBeforeCompile', () => {
-            console.log("BEFORE COMPILE!!");
-        })
+        hooks.watchRun.tap("onWatch", (comp) => {
+            //let watching = compiler.watching.watchOptions;
 
-        compiler.hooks.compilation.tap("AutoImportGlobalComponentsPlugin", (compilation) => {
-            console.log("ON COMPILATION TAP ");
-            this.options.forEach(rule => {
-                fillRuleData(rule, this.options.debug);
-            })
+            this.options.isInWatchBuild = true;
 
-            this.options.forEach(rule => {
-                writeRuleData(rule);
-            });
-            warn("Import rules applied to entry files", this.options.debug);
-        });
-
-        compiler.hooks.afterEmit.tap('AfterCompile', (compiliation) => {
-            console.log("ON AFTER COMPILE TAP");
-            if (this.options.clean !== false) {
-                this.options.forEach(rule => {
-                    cleanRuleData(rule);
-                    console.log(rule.globals);
-                });
-                warn("Cleaned up auto-imported rules", this.options.debug);
-            } else {
-                warn("Cleaning up is turned off", this.options.debug);
+            if (comp.modifiedFiles) {
+                this.options.filesChanged = Array.from(comp.modifiedFiles, (file) => getRelativeForwardUri(`${file}`));
             }
-        });
+
+            if (this.options.filesChanged && this.options.filesChanged.length > 0) {
+                let filesChangedCount = this.options.filesChanged.length;
+                let currentRuleMatchCount = 0;
+                this.options.rules.forEach(rule => {
+                    if (rule && rule.entries && rule.entries.length > 0) {
+                        let entries = rule.entries;
+                        entries.forEach(entry => {
+                            if (entry && entry.length > 0) {
+                                this.options.filesChanged.forEach(changed => {
+                                    if (entry.startsWith('.')) {
+                                        entry = entry.substring(1);
+                                    }
+                                    if (changed.endsWith(entry)) {
+                                        currentRuleMatchCount++;
+                                    }
+                                })
+                            }
+                        })
+                    }
+                })
+                this.options.isInWatchBuildCancel = currentRuleMatchCount === filesChangedCount;
+            }
+        })
+
+        hooks.beforeCompile.tap('onBeforeCompile ', () => {
+            if (this.options.isInWatchBuildCancel) {
+                return;
+            }
+
+            loadGlobalsAndImportsForRules(this.options);
+
+            this.options.rules.forEach(rule => {
+                writeRule(rule);
+            })
+            warn("Import rules applied to entry files", this.options.debug);
+        })
+
+        hooks.done.tap('onDone ', () => {
+            this.options.isInWatchBuildCancel = false;
+            this.options.isInWatchBuild = false;
+            if (this.options.isInWatchBuildCancel) {
+                return;
+            }
+
+            if (this.options.clean === true) {
+                this.options.rules.forEach(rule => {
+                    cleanRule(rule);
+                });
+            }
+        })
     }
-};
+}
 
 module.exports = AutoImportGlobalComponentsPlugin;

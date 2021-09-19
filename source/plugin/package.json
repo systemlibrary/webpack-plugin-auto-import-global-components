@@ -2,7 +2,7 @@
   "name": "auto-import-global-components",
   "description": "auto import exported classes and functions into entry files and add the components to the globalThis object in your TypeScript project",
   "private": false,
-  "version": "0.0.9",
+  "version": "0.0.10",
   "main": "index.js",
   "author": "System Library",
   "license": "MIT"

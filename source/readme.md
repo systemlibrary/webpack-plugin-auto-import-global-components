@@ -1,18 +1,3 @@
-# Local Development
-
-## Building and running on localhost
-- npm i
-- npm run dev
-- view the dist folder that it is built properly
-
-## Running demo
-- Uncomment the comment inside "app\index.html" to load some component "OnLoad"
-- Copy "app\index.html" to "dist\index.html" if index.html do not exists already
-- Copy "app\index.html" to "dist\index.html"
-- Run "npm run i" & "npm run dev"
-- Open the "dist\index.html" in a browser
-
-
 # auto-import-global-components
 
 ## Requirements
@@ -20,28 +5,29 @@
 - React
 - Components must be exported as any of these:
     - export default class <className>
-    - export class <className>
+    - export default function <funcName>
     - export default const <constName>
+    - export class <className>
+    - export function <funcName>
     - export const <constName>
-    - export default <className>
+    - export default <name>
 
 - The component's file name cannot start with a _ (underscore), all other ts/tsx files will be scanned
     - ./folder/Banner/Banner.tsx or ./folder/Banner/Index.tsx are two examples of files which will be scanned
-    - ./folder/HeroBanner/_HeroBanner.tsx will not be scanned due to underscore prefixed
 
 ## Usage
 Automatically searches for exported components in folders you specify through plugin-registration in webpack.config.
-- Each component found is added as an import statement in each entry file
-- Each component found is added to the globalThis object
-- Each component can have multiple exports, such as export const func1, export const func2... will be imported as:
-    - import { func1, func2, func3 ... } from './src/functions'
+- Each component found is added as an import statement in each entry file at the very top, if the import statement do not already exists
+- Each component found is added to globalThis object making it available for server side rendering
+- Each component can have multiple exports, such as export class car, export class user... will be imported as:
+    - import { car, user, ... } from './folder/file'
 - Each component is then available for server-side rendering through globalThis
 	- Tested via .NET package: React.Web.Mvc4
 
 ## Latest version
-- Fixed: previous v.0.0.5 errored if multiple components inside same folder
-- Fixed: if 'clean' is false, the next build would error in duplicated imports, the build will always clean initially
-- Adjusted readme
+- Supporting the --watch true to avoid infinite looping
+- Added some caching in case the same import/exports are to be used to save some looping and reading of files
+- Updated readme and docs
 
 ## Install
 - npm i auto-import-global-components --save-dev
@@ -53,10 +39,10 @@ const autoImportGlobalComponentsPlugin = require('auto-import-global-components'
 ...
 new autoImportGlobalComponentsPlugin({
 	debug: true/false, //enable/disable some logging output
-	clean: true/false, //enable/disable cleanup of text added to entry files during build
+	clean: true/false, //enable/disable cleanup of "globalThis" added to the entry files, the "import statements" cannot be undone
     rules: [{
-        folders: ['./src/Components/'], //find all components in this folder and its subfolders
-        entries: ['src/index.tsx']      //all found components is gets auto imported in these entries
+        folders: ['./src/Components/'], //find all components in 'Components' folder and its subfolders
+        entries: ['src/index.tsx']      //all found components gets imported in these entries, currently supporting only 1 entry file per rule
     }],
 })
 ```
@@ -105,17 +91,14 @@ plugins: [
 ```
 
 ### 3
-Now during compilation, the src/index.tsx will get some new lines at its very bottom
-- Lines will be removed if clean is true, else they will remain in the file
+Before compilation the src\index.tsx file will get new import statements at the top of the file, and at the bottom of the file globalThis initialization per component found
+- The globalThis initialization can be removed if 'clean' is true
 
 ## Future
-- Performance enhancements/cache...
-- Flag to enable smart import/added to global, if not already a module is imported, then add it, else do nothing...
-- Adding more output logging in case of hitting errors, or wrong folder/module names...
-- Considering less strict naming conventions for folders/files
-	* Currently files must be tsx or ts files and without a underscore prefix
-- Smarter adding/removal of imports to entry files, now they are always at bottom...
-
+- Further supporting --watch to avoid double compilation (watch command/plugin and webpack just sucks, no easy way to just "stop watching/resume watching" through the compiler object [looked at compiler.watching and its variables "validate", "suspend", etc...seems like one need to iterate over all watchers...) ]
+- Smarter way of adding globalThis to the entry file, which results in removal of "clean" flag
+- Supporting multiple entry files (Why? No clue yet)
+- Currently reading only ts and tsx files, might support ".js" and ".jsx" too
 
 ## Lisence
 - Free forever, copy paste as you'd like

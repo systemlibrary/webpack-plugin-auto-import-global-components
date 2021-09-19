@@ -1,6 +1,6 @@
-const { warn, success } = require('./_console');
+const { warn, success } = require('./functions/_console');
 
-function getImportStatements(components, importPath, debug) {
+function getImportStatements(components, importPath, existingImports, debug) {
     if (!components || components.length <= 0) return [];
 
     if (!importPath || importPath.length <= 0) {
@@ -29,11 +29,15 @@ function getImportStatements(components, importPath, debug) {
     if (imp !== null) {
         imp += "} from '" + importPath + "';";
     }
+
+
     let imports = [];
-    if (impDefault !== null)
+    if (impDefault !== null && !existingImports.includes(impDefault)) {
         imports.push(impDefault);
-    if (imp !== null)
+    }
+    if (imp !== null && !existingImports.includes(imp)) {
         imports.push(imp);
+    }
 
     return imports;
 };

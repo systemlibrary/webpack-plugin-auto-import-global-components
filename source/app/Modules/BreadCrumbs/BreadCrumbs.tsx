@@ -22,7 +22,7 @@ export default class BreadCrumbs extends React.Component<BreadcrumbProps, {}>
             <div className="breadcrumbs">
                 <div className={"breadcrumbs-container " + color + " " + backgroundColor}>
                     <ul>
-                        <li>Breadcrumbs from react through auto-exported plugin {this.props.anotherColor}</li>
+                        <li>Breadcrumbs from react through auto-exported plugin - code from sourcetree git repo! {this.props.anotherColor}</li>
                         <li>Classes passed: {this.props.color} and {this.props.backgroundColor}</li>
                         <li>Start value from C# {this.props.start}</li>
                         <li>End value from C#  {this.props.end}</li>
